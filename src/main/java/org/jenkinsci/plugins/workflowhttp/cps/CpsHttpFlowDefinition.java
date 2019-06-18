@@ -42,6 +42,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.HttpGet;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowExecution;
+import org.jenkinsci.plugins.workflow.cps.CpsFlowFactoryAction2;
 import org.jenkinsci.plugins.workflow.cps.persistence.PersistIn;
 import org.jenkinsci.plugins.workflow.flow.*;
 import org.kohsuke.stapler.*;
@@ -90,6 +91,14 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     @Override
     public CpsFlowExecution create(FlowExecutionOwner owner, TaskListener listener, List<? extends Action> actions)
             throws Exception {
+
+        // This little bit of code allows replays to work
+        for (Action a : actions) {
+            if (a instanceof CpsFlowFactoryAction2) {
+                return ((CpsFlowFactoryAction2) a).create(this, owner, actions);
+            }
+        }
+
         Queue.Executable _build = owner.getExecutable();
         if (!(_build instanceof Run)) {
             throw new IOException("Can only pull a Jenkinsfile in a run");
