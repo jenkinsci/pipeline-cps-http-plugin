@@ -9,7 +9,7 @@
         <relativePath />
     </parent>
     <groupId>io.jenkins.plugins</groupId>
-    <artifactId>workflow-cps-http</artifactId>
+    <artifactId>pipeline-cps-http</artifactId>
     <version>0.1.2-SNAPSHOT</version>
     <packaging>hpi</packaging>
     <properties>

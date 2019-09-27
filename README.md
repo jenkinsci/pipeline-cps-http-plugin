@@ -29,7 +29,7 @@ Go to the Jenkins Administration Plugins UI > Advanced section and upload the pl
 1. Create a pipeline job
 2. Select the `Pipeline script from HTTP` option in the `Pipeline` section
 
-![Example](https://raw.githubusercontent.com/coveo/workflow-cps-http-plugin/master/example.png)
+![Example](https://raw.githubusercontent.com/jenkinsci/pipeline-cps-http-plugin/master/example.png)
 
 ## Contributing
 
