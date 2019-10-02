@@ -33,6 +33,7 @@ import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
 import hudson.Util;
 import hudson.model.*;
+import hudson.model.Queue;
 import hudson.scm.SCM;
 import hudson.scm.SCMDescriptor;
 import hudson.security.ACL;
@@ -48,13 +49,12 @@ import org.jenkinsci.plugins.workflow.cps.persistence.PersistIn;
 import org.jenkinsci.plugins.workflow.flow.*;
 import org.kohsuke.stapler.*;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.time.Instant;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.JOB;
@@ -63,11 +63,14 @@ import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.
 
     private final String scriptUrl;
     private final int retryCount;
+    private final CachingConfiguration cachingConfiguration;
     private String credentialsId;
 
-    @DataBoundConstructor public CpsHttpFlowDefinition(String scriptUrl, int retryCount) {
+    @DataBoundConstructor public CpsHttpFlowDefinition(String scriptUrl, int retryCount, CachingConfiguration
+            cachingConfiguration) {
         this.scriptUrl = scriptUrl.trim();
         this.retryCount = retryCount;
+        this.cachingConfiguration = cachingConfiguration;
     }
 
     public String getScriptUrl() {
@@ -78,15 +81,24 @@ import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.
         return retryCount;
     }
 
-    @DataBoundSetter public void setCredentialsId(String credentialsId) {
-        this.credentialsId = Util.fixEmpty(credentialsId);
+    public CachingConfiguration getCachingConfiguration() {
+        return cachingConfiguration;
+    }
+
+    public Instant getExpirationDate() {
+        return Instant.now().plusSeconds(cachingConfiguration.getCachingSeconds());
     }
 
     public String getCredentialsId() {
         return credentialsId;
     }
 
-    @Override public CpsFlowExecution create(FlowExecutionOwner owner, TaskListener listener, List<? extends Action> actions)
+    @DataBoundSetter public void setCredentialsId(String credentialsId) {
+        this.credentialsId = Util.fixEmpty(credentialsId);
+    }
+
+    @Override public CpsFlowExecution create(FlowExecutionOwner owner, TaskListener listener, List<? extends Action>
+            actions)
             throws Exception {
 
         // This little bit of code allows replays to work
@@ -110,7 +122,9 @@ import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.
 
         HttpGet httpGet = new HttpGet(expandedScriptUrl);
         if (credentialsId != null) {
-            UsernamePasswordCredentials credentials = CredentialsMatchers.firstOrNull(CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance(), ACL.SYSTEM, Collections.emptyList()), CredentialsMatchers.withId(credentialsId));
+            UsernamePasswordCredentials credentials = CredentialsMatchers.firstOrNull(CredentialsProvider
+                    .lookupCredentials(UsernamePasswordCredentials.class, Jenkins.get(), ACL.SYSTEM, Collections
+                            .emptyList()), CredentialsMatchers.withId(credentialsId));
             if (credentials != null) {
                 String encoded = Base64.getEncoder().encodeToString((credentials.getUsername() + ":"
                         + credentials.getPassword()).getBytes(StandardCharsets.UTF_8));
@@ -119,25 +133,52 @@ import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.
             }
         }
 
-        AtomicReference<CpsFlowExecution> result = new AtomicReference<>(null);
+        AtomicReference<String> scriptReference = new AtomicReference<>(null);
 
-        client.connect("get pipeline", "get pipeline from " + expandedScriptUrl, c -> c.execute(httpGet), response -> {
-            try (InputStream is = response.getEntity().getContent()) {
-                String script = IOUtils.toString(is, "UTF-8");
-                Queue.Executable queueExec = owner.getExecutable();
-                FlowDurabilityHint hint = (queueExec instanceof Run) ?
-                        DurabilityHintProvider.suggestedFor(((Run) queueExec).getParent()) :
-                        GlobalDefaultFlowDurabilityLevel.getDefaultDurabilityHint();
-                result.set(new CpsFlowExecution(script, true, owner, hint));
+        if (cachingConfiguration != null) {
+            Map<String, CacheEntry> pipelineCache = CacheEntry.cache;
+
+            if (pipelineCache.containsKey(expandedScriptUrl)) {
+                listener.getLogger().println("Fetching from cache");
+                if (pipelineCache.get(expandedScriptUrl).expirationDate.isBefore(Instant.now())) {
+                    listener.getLogger().println("Cache is expired. Clearing");
+                    pipelineCache.remove(expandedScriptUrl);
+                }
+            } else {
+                listener.getLogger().println("Cache miss. Actually fetching from HTTP");
             }
-        }, listener);
 
-        return result.get();
+            if (!pipelineCache.containsKey(expandedScriptUrl)) {
+                client.connect("get pipeline",
+                        "get pipeline from " + expandedScriptUrl, c -> c.execute(httpGet), response -> {
+                            try (InputStream is = response.getEntity().getContent()) {
+                                String script = IOUtils.toString(is, "UTF-8");
+                                pipelineCache.put(expandedScriptUrl, new CacheEntry(getExpirationDate(), script));
+                            }
+                        }, listener);
+            }
+
+            scriptReference.set(pipelineCache.get(expandedScriptUrl).script);
+        } else {
+            client.connect("get pipeline",
+                    "get pipeline from " + expandedScriptUrl, c -> c.execute(httpGet), response -> {
+                        try (InputStream is = response.getEntity().getContent()) {
+                            String script = IOUtils.toString(is, "UTF-8");
+                            scriptReference.set(script);
+                        }
+                    }, listener);
+        }
+
+        Queue.Executable queueExec = owner.getExecutable();
+        FlowDurabilityHint hint = (queueExec instanceof Run) ?
+                DurabilityHintProvider.suggestedFor(((Run) queueExec).getParent()) :
+                GlobalDefaultFlowDurabilityLevel.getDefaultDurabilityHint();
+        return new CpsFlowExecution(scriptReference.get(), true, owner, hint);
+
     }
 
     @Extension public static class DescriptorImpl extends FlowDefinitionDescriptor {
-
-        @Override public String getDisplayName() {
+        @Override @Nonnull public String getDisplayName() {
             return "Pipeline script from HTTP";
         }
 
@@ -147,8 +188,21 @@ import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.
             return SCM._for(job);
         }
 
-        public ListBoxModel doFillCredentialsIdItems(@QueryParameter String scriptUrl, @QueryParameter String credentialsId) {
-            return new StandardListBoxModel().includeEmptyValue().includeMatchingAs(ACL.SYSTEM, Jenkins.getInstance(), StandardUsernamePasswordCredentials.class, URIRequirementBuilder.fromUri(scriptUrl).build(), CredentialsMatchers.always()).includeCurrentValue(credentialsId);
+        public ListBoxModel doFillCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String scriptUrl,
+                @QueryParameter String credentialsId) {
+            final StandardListBoxModel result = new StandardListBoxModel();
+            if (item == null) {
+                if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
+                    return result.includeCurrentValue(credentialsId);
+                }
+            } else {
+                if (!item.hasPermission(Item.EXTENDED_READ) && !item.hasPermission(CredentialsProvider.USE_ITEM)) {
+                    return result.includeCurrentValue(credentialsId);
+                }
+            }
+            return result.includeEmptyValue().includeMatchingAs(ACL.SYSTEM, Jenkins.get(),
+                    StandardUsernamePasswordCredentials.class, URIRequirementBuilder.fromUri(scriptUrl).build(),
+                    CredentialsMatchers.always()).includeCurrentValue(credentialsId);
         }
 
     }
