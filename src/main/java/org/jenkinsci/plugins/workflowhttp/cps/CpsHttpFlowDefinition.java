@@ -37,6 +37,7 @@ import hudson.scm.SCM;
 import hudson.scm.SCMDescriptor;
 import hudson.security.ACL;
 import hudson.util.ListBoxModel;
+import io.jenkins.plugins.httpclient.RobustHTTPClient;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
@@ -46,9 +47,9 @@ import org.jenkinsci.plugins.workflow.cps.CpsFlowFactoryAction2;
 import org.jenkinsci.plugins.workflow.cps.persistence.PersistIn;
 import org.jenkinsci.plugins.workflow.flow.*;
 import org.kohsuke.stapler.*;
-import io.jenkins.plugins.httpclient.RobustHTTPClient;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Collection;
@@ -58,15 +59,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.JOB;
 
-@PersistIn(JOB)
-public class CpsHttpFlowDefinition extends FlowDefinition {
+@PersistIn(JOB) public class CpsHttpFlowDefinition extends FlowDefinition {
 
     private final String scriptUrl;
     private final int retryCount;
     private String credentialsId;
 
-    @DataBoundConstructor
-    public CpsHttpFlowDefinition(String scriptUrl, int retryCount) {
+    @DataBoundConstructor public CpsHttpFlowDefinition(String scriptUrl, int retryCount) {
         this.scriptUrl = scriptUrl.trim();
         this.retryCount = retryCount;
     }
@@ -79,8 +78,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
         return retryCount;
     }
 
-    @DataBoundSetter
-    public void setCredentialsId(String credentialsId) {
+    @DataBoundSetter public void setCredentialsId(String credentialsId) {
         this.credentialsId = Util.fixEmpty(credentialsId);
     }
 
@@ -88,8 +86,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
         return credentialsId;
     }
 
-    @Override
-    public CpsFlowExecution create(FlowExecutionOwner owner, TaskListener listener, List<? extends Action> actions)
+    @Override public CpsFlowExecution create(FlowExecutionOwner owner, TaskListener listener, List<? extends Action> actions)
             throws Exception {
 
         // This little bit of code allows replays to work
@@ -113,14 +110,10 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
 
         HttpGet httpGet = new HttpGet(expandedScriptUrl);
         if (credentialsId != null) {
-            UsernamePasswordCredentials credentials = CredentialsMatchers
-                    .firstOrNull(
-                            CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class,
-                                    Jenkins.getInstance(), ACL.SYSTEM, Collections.emptyList()),
-                            CredentialsMatchers.withId(credentialsId));
+            UsernamePasswordCredentials credentials = CredentialsMatchers.firstOrNull(CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance(), ACL.SYSTEM, Collections.emptyList()), CredentialsMatchers.withId(credentialsId));
             if (credentials != null) {
-                String encoded = Base64.getEncoder().encodeToString(
-                        (credentials.getUsername() + ":" + credentials.getPassword()).getBytes(StandardCharsets.UTF_8));
+                String encoded = Base64.getEncoder().encodeToString((credentials.getUsername() + ":"
+                        + credentials.getPassword()).getBytes(StandardCharsets.UTF_8));
                 httpGet.setHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
                 CredentialsProvider.track(build, credentials);
             }
@@ -132,9 +125,9 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
             try (InputStream is = response.getEntity().getContent()) {
                 String script = IOUtils.toString(is, "UTF-8");
                 Queue.Executable queueExec = owner.getExecutable();
-                FlowDurabilityHint hint = (queueExec instanceof Run)
-                        ? DurabilityHintProvider.suggestedFor(((Run) queueExec).getParent())
-                        : GlobalDefaultFlowDurabilityLevel.getDefaultDurabilityHint();
+                FlowDurabilityHint hint = (queueExec instanceof Run) ?
+                        DurabilityHintProvider.suggestedFor(((Run) queueExec).getParent()) :
+                        GlobalDefaultFlowDurabilityLevel.getDefaultDurabilityHint();
                 result.set(new CpsFlowExecution(script, true, owner, hint));
             }
         }, listener);
@@ -142,11 +135,9 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
         return result.get();
     }
 
-    @Extension
-    public static class DescriptorImpl extends FlowDefinitionDescriptor {
+    @Extension public static class DescriptorImpl extends FlowDefinitionDescriptor {
 
-        @Override
-        public String getDisplayName() {
+        @Override public String getDisplayName() {
             return "Pipeline script from HTTP";
         }
 
@@ -156,12 +147,8 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
             return SCM._for(job);
         }
 
-        public ListBoxModel doFillCredentialsIdItems(@QueryParameter String scriptUrl,
-                @QueryParameter String credentialsId) {
-            return new StandardListBoxModel().includeEmptyValue()
-                    .includeMatchingAs(ACL.SYSTEM, Jenkins.getInstance(), StandardUsernamePasswordCredentials.class,
-                            URIRequirementBuilder.fromUri(scriptUrl).build(), CredentialsMatchers.always())
-                    .includeCurrentValue(credentialsId);
+        public ListBoxModel doFillCredentialsIdItems(@QueryParameter String scriptUrl, @QueryParameter String credentialsId) {
+            return new StandardListBoxModel().includeEmptyValue().includeMatchingAs(ACL.SYSTEM, Jenkins.getInstance(), StandardUsernamePasswordCredentials.class, URIRequirementBuilder.fromUri(scriptUrl).build(), CredentialsMatchers.always()).includeCurrentValue(credentialsId);
         }
 
     }

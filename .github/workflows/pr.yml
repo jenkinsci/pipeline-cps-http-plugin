@@ -1,0 +1,14 @@
+name: Build Pull Request
+on: [pull_request]
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Build
+        uses: LucaFeger/action-maven-cli@master
+        with:
+          args: clean install
