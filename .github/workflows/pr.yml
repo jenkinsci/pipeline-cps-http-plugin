@@ -11,4 +11,4 @@ jobs:
       - name: Build
         uses: LucaFeger/action-maven-cli@master
         with:
-          args: clean install
+          args: clean install -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
