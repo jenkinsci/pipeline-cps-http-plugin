@@ -24,7 +24,10 @@
 
 package org.jenkinsci.plugins.workflowhttp.cps;
 
+import hudson.model.ParameterDefinition;
+import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Result;
+import hudson.model.StringParameterDefinition;
 import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
@@ -39,102 +42,175 @@ import java.nio.file.Paths;
 import static org.junit.Assert.assertEquals;
 
 public class CpsHttpFlowDefinitionTest {
-    @Rule public JenkinsRule r = new JenkinsRule();
+  @Rule public JenkinsRule r = new JenkinsRule();
 
-    @Test public void testRunScriptFromUserContent() throws Exception {
-        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
-        Path path = Paths.get(r.jenkins.getRootPath().getRemote(), "userContent", "test.groovy");
-        Files.write(path, "echo 'Hello from HTTP'".getBytes());
+  @Test
+  public void testRunScriptFromUserContent() throws Exception {
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    Path path =
+        Paths.get(
+            r.jenkins.getRootPath().getRemote(),
+            "userContent",
+            "testRunScriptFromUserContent.groovy");
+    Files.write(path, "echo 'Hello from HTTP'".getBytes());
 
-        String url = r.jenkins.getRootUrl() + "userContent/test.groovy";
-        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, null);
-        p.setDefinition(def);
-        WorkflowRun b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogContains("Hello from HTTP", b);
-    }
+    String url = r.jenkins.getRootUrl() + "userContent/testRunScriptFromUserContent.groovy";
+    CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, null);
+    p.setDefinition(def);
+    WorkflowRun b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("No caching config. Fetching from HTTP", b);
+    r.assertLogContains("Hello from HTTP", b);
+  }
 
-    @Test public void testFetchAgainWithoutCaching() throws Exception {
-        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
-        Path path = Paths.get(r.jenkins.getRootPath().getRemote(), "userContent", "test.groovy");
-        Files.write(path, "echo 'Hello from HTTP'".getBytes());
-        String url = r.jenkins.getRootUrl() + "userContent/test.groovy";
+  @Test
+  public void testFetchAgainWithoutCaching() throws Exception {
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    Path path =
+        Paths.get(
+            r.jenkins.getRootPath().getRemote(),
+            "userContent",
+            "testFetchAgainWithoutCaching.groovy");
+    Files.write(path, "echo 'Hello from HTTP'".getBytes());
+    String url = r.jenkins.getRootUrl() + "userContent/testFetchAgainWithoutCaching.groovy";
 
-        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, null);
-        p.setDefinition(def);
-        WorkflowRun b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogNotContains("Cach", b);
-        r.assertLogContains("Hello from HTTP", b);
+    CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, null);
+    p.setDefinition(def);
+    WorkflowRun b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("No caching config. Fetching from HTTP", b);
+    r.assertLogContains("Hello from HTTP", b);
 
-        Files.write(path, "echo 'Hello from HTTP 2'".getBytes());
-        def = new CpsHttpFlowDefinition(url, 3, null);
-        p.setDefinition(def);
-        b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogNotContains("Cach", b);
-        r.assertLogContains("Hello from HTTP 2", b);
-    }
+    Files.write(path, "echo 'Hello from HTTP 2'".getBytes());
+    def = new CpsHttpFlowDefinition(url, 3, null);
+    p.setDefinition(def);
+    b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("No caching config. Fetching from HTTP", b);
+    r.assertLogContains("Hello from HTTP 2", b);
+  }
 
-    @Test public void testFetchAgainWithCaching() throws Exception {
-        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
-        Path path = Paths.get(r.jenkins.getRootPath().getRemote(), "userContent", "test.groovy");
-        Files.write(path, "echo 'Hello from HTTP'".getBytes());
-        String url = r.jenkins.getRootUrl() + "userContent/test.groovy";
+  @Test
+  public void testFetchAgainWithCaching() throws Exception {
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    Path path =
+        Paths.get(
+            r.jenkins.getRootPath().getRemote(), "userContent", "testFetchAgainWithCaching.groovy");
+    Files.write(path, "echo 'Hello from HTTP'".getBytes());
+    String url = r.jenkins.getRootUrl() + "userContent/testFetchAgainWithCaching.groovy";
 
-        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(5));
-        p.setDefinition(def);
-        WorkflowRun b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogContains("Cache miss. Actually fetching from HTTP", b);
-        r.assertLogContains("Hello from HTTP", b);
+    CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(5, ""));
+    p.setDefinition(def);
+    WorkflowRun b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("Cache miss. Actually fetching from HTTP", b);
+    r.assertLogContains("Hello from HTTP", b);
 
-        Files.write(path, "echo 'Hello from HTTP 2'".getBytes());
-        def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(5));
-        p.setDefinition(def);
-        b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogContains("Fetching from cache", b);
-        r.assertLogContains("Hello from HTTP", b);
-    }
+    Files.write(path, "echo 'Hello from HTTP 2'".getBytes());
+    def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(5, ""));
+    p.setDefinition(def);
+    b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("Fetching from cache", b);
+    r.assertLogContains("Hello from HTTP", b);
+  }
 
-    @Test public void testFetchAgainWithExpiredCaching() throws Exception {
-        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
-        Path path = Paths.get(r.jenkins.getRootPath().getRemote(), "userContent", "test.groovy");
-        Files.write(path, "echo 'Hello from HTTP'".getBytes());
-        String url = r.jenkins.getRootUrl() + "userContent/test.groovy";
+  @Test
+  public void testFetchCachedExcludedCase() throws Exception {
+    ParameterDefinition paramDef =
+        new StringParameterDefinition("CUSTOM_BUILD_PARAM", "This-IsMyValue", "");
+    ParametersDefinitionProperty paramsDef = new ParametersDefinitionProperty(paramDef);
 
-        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(0));
-        p.setDefinition(def);
-        WorkflowRun b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogContains("Cache miss. Actually fetching from HTTP", b);
-        r.assertLogContains("Hello from HTTP", b);
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    p.addProperty(paramsDef);
 
-        Files.write(path, "echo 'Hello from HTTP 2'".getBytes());
-        def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(0));
-        p.setDefinition(def);
-        b = r.buildAndAssertSuccess(p);
-        r.assertLogContains("Fetching pipeline from " + url, b);
-        r.assertLogContains("Cache is expired. Clearing", b);
-        r.assertLogContains("Hello from HTTP 2", b);
-    }
+    Path path =
+        Paths.get(
+            r.jenkins.getRootPath().getRemote(),
+            "userContent",
+            "testFetchCachedExcludedCase.groovy");
+    Files.write(path, "echo 'Hello from HTTP'".getBytes());
+    String url = r.jenkins.getRootUrl() + "userContent/testFetchCachedExcludedCase.groovy";
 
-    @Test public void testRunJenkinsHomePageAsPipeline() throws Exception {
-        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
-        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(r.jenkins.getRootUrl(), 3, null);
-        p.setDefinition(def);
-        WorkflowRun b = r.assertBuildStatus(Result.FAILURE, p.scheduleBuild2(0));
-        r.assertLogContains("unexpected token", b);
-    }
+    CpsHttpFlowDefinition def =
+        new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(5, "CUSTOM_BUILD_PARAM=*Is*"));
+    p.setDefinition(def);
+    WorkflowRun b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("Caching excluded from environment variables", b);
+    r.assertLogContains("Hello from HTTP", b);
+  }
 
-    @Test public void testRetryCount() throws Exception {
-        String scriptUrl = "https://bad-website-jenkins-test.com/Jenkinsfile";
-        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
-        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(scriptUrl, 3, null);
-        p.setDefinition(def);
-        WorkflowRun b = r.assertBuildStatus(Result.FAILURE, p.scheduleBuild2(0));
-        assertEquals(3, StringUtils.countMatches(r.getLog(b), "Retrying get pipeline"));
-    }
+  @Test
+  public void testFetchCachedNotExcludedCase() throws Exception {
+    ParameterDefinition paramDef =
+        new StringParameterDefinition("CUSTOM_BUILD_PARAM", "This-IsMyValue", "");
+    ParametersDefinitionProperty paramsDef = new ParametersDefinitionProperty(paramDef);
 
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    p.addProperty(paramsDef);
+
+    Path path =
+        Paths.get(
+            r.jenkins.getRootPath().getRemote(),
+            "userContent",
+            "testFetchCachedNotExcludedCase.groovy");
+    Files.write(path, "echo 'Hello from HTTP'".getBytes());
+    String url = r.jenkins.getRootUrl() + "userContent/testFetchCachedNotExcludedCase.groovy";
+
+    CpsHttpFlowDefinition def =
+        new CpsHttpFlowDefinition(
+            url, 3, new CachingConfiguration(5, "CUSTOM_BUILD_PARAM=This-Is-Not*"));
+    p.setDefinition(def);
+    WorkflowRun b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("Cache miss. Actually fetching from HTTP", b);
+    r.assertLogContains("Hello from HTTP", b);
+  }
+
+  @Test
+  public void testFetchAgainWithExpiredCaching() throws Exception {
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    Path path =
+        Paths.get(
+            r.jenkins.getRootPath().getRemote(),
+            "userContent",
+            "testFetchAgainWithExpiredCaching.groovy");
+    Files.write(path, "echo 'Hello from HTTP'".getBytes());
+    String url = r.jenkins.getRootUrl() + "userContent/testFetchAgainWithExpiredCaching.groovy";
+
+    CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(0, ""));
+    p.setDefinition(def);
+    WorkflowRun b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("Cache miss. Actually fetching from HTTP", b);
+    r.assertLogContains("Hello from HTTP", b);
+
+    Files.write(path, "echo 'Hello from HTTP 2'".getBytes());
+    def = new CpsHttpFlowDefinition(url, 3, new CachingConfiguration(0, ""));
+    p.setDefinition(def);
+    b = r.buildAndAssertSuccess(p);
+    r.assertLogContains("Fetching pipeline from " + url, b);
+    r.assertLogContains("Cache is expired. Clearing", b);
+    r.assertLogContains("Hello from HTTP 2", b);
+  }
+
+  @Test
+  public void testRunJenkinsHomePageAsPipeline() throws Exception {
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(r.jenkins.getRootUrl(), 3, null);
+    p.setDefinition(def);
+    WorkflowRun b = r.assertBuildStatus(Result.FAILURE, p.scheduleBuild2(0));
+    r.assertLogContains("unexpected token", b);
+  }
+
+  @Test
+  public void testRetryCount() throws Exception {
+    String scriptUrl = "https://bad-website-jenkins-test.com/Jenkinsfile";
+    WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+    CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(scriptUrl, 3, null);
+    p.setDefinition(def);
+    WorkflowRun b = r.assertBuildStatus(Result.FAILURE, p.scheduleBuild2(0));
+    assertEquals(3, StringUtils.countMatches(r.getLog(b), "Retrying get pipeline"));
+  }
 }

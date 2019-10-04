@@ -41,5 +41,8 @@ THE SOFTWARE.
         <f:entry title="${%Caching minutes}" field="cachingMinutes">
           <f:number clazz="number" name="cachingMinutes" value="${instance.cachingConfiguration.cachingMinutes}" default="60" min="1" step="1"/>
         </f:entry>
+        <f:entry field="excludedCasesString" title="${%Excluded Cases}">
+            <f:textbox value="${instance.cachingConfiguration.excludedCasesString}"/>
+        </f:entry>
     </f:optionalBlock>
 </j:jelly>
