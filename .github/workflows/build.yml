@@ -20,8 +20,8 @@ jobs:
 
       - name: Release Tag
         if: github.ref != 'refs/heads/master'
-        uses: JasonEtco/upload-to-release@master
+        uses: softprops/action-gh-release@v1
         with:
-          args: target/pipeline-cps-http.hpi
+          files: target/pipeline-cps-http.hpi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
