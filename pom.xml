@@ -18,6 +18,7 @@
         <useBeta>true</useBeta>
     </properties>
     <name>Pipeline: Groovy HTTP</name>
+    <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
     <licenses>
         <license>
             <name>MIT License</name>
