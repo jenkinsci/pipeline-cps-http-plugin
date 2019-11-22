@@ -8,28 +8,18 @@ This is a way to separate to concerns : source code (SCM) and built artifacts (b
 
 The HTTP Pipeline Plugin was implemented to retrieve Jenkinsfiles through HTTP (or HTTPs) instead of a SCM.
 
-## Installation of the plugin
-
-### Installing from source
-
-You can follow the steps hereafter to install the plugin:
-* Clone the sources of this repository
-* Run ```mvn package``` in order to compile the sources and package them in a .hpi file
-* Follow the [instructions that can be found on the Jenkins website](https://jenkins.io/doc/book/managing/plugins/#installing-a-plugin) and install the plugin that has been packaged in ```target/http-shared-lib.hpi```
-
-### Installing from artifact
-
-TODO Update when releases will be published on github (with the link and more details)
-
-Download the wished plugin release from the Github releases section.
-Go to the Jenkins Administration Plugins UI > Advanced section and upload the plugin .hpi file.
-
 ## How to use the plugin
 
 1. Create a pipeline job
 2. Select the `Pipeline script from HTTP` option in the `Pipeline` section
 
 ![Example](https://raw.githubusercontent.com/jenkinsci/pipeline-cps-http-plugin/master/example.png)
+
+## Releasing
+To release simply call the following script:
+```
+mvn release:prepare release:perform
+```
 
 ## Contributing
 
