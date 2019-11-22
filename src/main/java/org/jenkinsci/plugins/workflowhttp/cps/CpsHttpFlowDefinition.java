@@ -40,7 +40,6 @@ import hudson.scm.SCMDescriptor;
 import hudson.security.ACL;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
-import io.jenkins.plugins.httpclient.RobustHTTPClient;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
@@ -57,6 +56,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.JOB;
@@ -126,6 +126,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
 
     RobustHTTPClient client = new RobustHTTPClient();
     client.setStopAfterAttemptNumber(retryCount + 1);
+    client.setWaitMultiplier(1, TimeUnit.SECONDS);
 
     HttpGet httpGet = new HttpGet(expandedScriptUrl);
     if (credentialsId != null) {
