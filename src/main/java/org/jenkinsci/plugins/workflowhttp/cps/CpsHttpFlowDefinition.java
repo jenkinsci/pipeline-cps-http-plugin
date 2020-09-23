@@ -65,14 +65,16 @@ import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.
 public class CpsHttpFlowDefinition extends FlowDefinition {
 
   private final String scriptUrl;
+  private final String setAcceptHeader;
   private final int retryCount;
   private final CachingConfiguration cachingConfiguration;
   private String credentialsId;
 
   @DataBoundConstructor
   public CpsHttpFlowDefinition(
-      String scriptUrl, int retryCount, CachingConfiguration cachingConfiguration) {
+      String scriptUrl, String setAcceptHeader, int retryCount, CachingConfiguration cachingConfiguration) {
     this.scriptUrl = scriptUrl.trim();
+    this.setAcceptHeader = setAcceptHeader;
     this.retryCount = retryCount;
     this.cachingConfiguration = cachingConfiguration;
   }
@@ -80,6 +82,8 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
   public String getScriptUrl() {
     return scriptUrl;
   }
+
+  public String getSetAcceptHeader() { return setAcceptHeader;}
 
   public int getRetryCount() {
     return retryCount;
@@ -129,6 +133,9 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     client.setWaitMultiplier(1, TimeUnit.SECONDS);
 
     HttpGet httpGet = new HttpGet(expandedScriptUrl);
+    if (!setAcceptHeader.isEmpty()) {
+      httpGet.setHeader(HttpHeaders.ACCEPT, setAcceptHeader);
+    }
     if (credentialsId != null) {
       UsernamePasswordCredentials credentials =
           CredentialsMatchers.firstOrNull(
