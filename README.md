@@ -15,6 +15,11 @@ The HTTP Pipeline Plugin was implemented to retrieve Jenkinsfiles through HTTP (
 
 ![Example](https://raw.githubusercontent.com/jenkinsci/pipeline-cps-http-plugin/master/example.png)
 
+### Use with the GitHub API
+
+URL: https://api.github.com/repos/[your_org]/[your_repo]/contents/[path_in_repo]?ref=master
+Accept Header: application/vnd.github.VERSION.raw
+
 ## Releasing
 To release simply call the following script:
 ```

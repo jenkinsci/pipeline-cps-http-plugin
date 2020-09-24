@@ -28,6 +28,9 @@ THE SOFTWARE.
     <f:entry field="scriptUrl" title="${%Script URL}">
         <f:textbox default="https://example.com/Jenkinsfile"/>
     </f:entry>
+    <f:entry field="setAcceptHeader" title="Accept header">
+        <f:textbox default=""/>
+    </f:entry>
     <f:entry title="${%GET Retry Count}" field="retryCount">
       <f:number clazz="number" name="retryCount" value="${it.retryCount}" min="0" step="1"/>
     </f:entry>
