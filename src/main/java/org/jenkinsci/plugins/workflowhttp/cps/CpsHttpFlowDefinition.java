@@ -133,7 +133,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     client.setWaitMultiplier(1, TimeUnit.SECONDS);
 
     HttpGet httpGet = new HttpGet(expandedScriptUrl);
-    if (!setAcceptHeader.isEmpty()) {
+    if (setAcceptHeader != null && !setAcceptHeader.isEmpty()) {
       httpGet.setHeader(HttpHeaders.ACCEPT, setAcceptHeader);
     }
     if (credentialsId != null) {
