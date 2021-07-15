@@ -28,6 +28,12 @@ THE SOFTWARE.
     <f:entry field="scriptUrl" title="${%Script URL}">
         <f:textbox default="https://example.com/Jenkinsfile"/>
     </f:entry>
+    <f:entry field="setKeyHeader" title="Key header">
+        <f:textbox default=""/>
+    </f:entry>
+    <f:entry field="setValueHeader" title="Value header">
+        <f:textbox default=""/>
+    </f:entry>
     <f:entry field="setAcceptHeader" title="Accept header">
         <f:textbox default=""/>
     </f:entry>

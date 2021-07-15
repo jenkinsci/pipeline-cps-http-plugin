@@ -24,6 +24,8 @@ Accept Header: application/vnd.github.VERSION.raw
 To release simply call the following script:
 ```
 mvn release:prepare release:perform
+or
+docker run --rm -it -v "$(pwd)":/usr/src/mymaven -w /usr/src/mymaven maven:3.8.1-openjdk-8 mvn release:prepare release:perform
 ```
 
 ## Contributing

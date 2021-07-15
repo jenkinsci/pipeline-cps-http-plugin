@@ -66,15 +66,19 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
 
   private final String scriptUrl;
   private final String setAcceptHeader;
+  private final String setKeyHeader;
+  private final String setValueHeader;
   private final int retryCount;
   private final CachingConfiguration cachingConfiguration;
   private String credentialsId;
 
   @DataBoundConstructor
   public CpsHttpFlowDefinition(
-      String scriptUrl, String setAcceptHeader, int retryCount, CachingConfiguration cachingConfiguration) {
+      String scriptUrl, String setAcceptHeader, String setKeyHeader, String setValueHeader,  int retryCount, CachingConfiguration cachingConfiguration) {
     this.scriptUrl = scriptUrl.trim();
     this.setAcceptHeader = setAcceptHeader;
+    this.setKeyHeader = setKeyHeader;
+    this.setValueHeader = setValueHeader;
     this.retryCount = retryCount;
     this.cachingConfiguration = cachingConfiguration;
   }
@@ -84,6 +88,10 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
   }
 
   public String getSetAcceptHeader() { return setAcceptHeader;}
+
+  public String getSetKeyHeader() { return setKeyHeader; }
+
+  public String getSetValueHeader() { return setValueHeader; }
 
   public int getRetryCount() {
     return retryCount;
@@ -135,6 +143,9 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     HttpGet httpGet = new HttpGet(expandedScriptUrl);
     if (setAcceptHeader != null && !setAcceptHeader.isEmpty()) {
       httpGet.setHeader(HttpHeaders.ACCEPT, setAcceptHeader);
+    }
+    if (setKeyHeader != null && !setKeyHeader.isEmpty() && setValueHeader != null && !setValueHeader.isEmpty()){
+      httpGet.setHeader(setKeyHeader, setValueHeader);
     }
     if (credentialsId != null) {
       UsernamePasswordCredentials credentials =
