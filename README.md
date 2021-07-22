@@ -20,6 +20,11 @@ The HTTP Pipeline Plugin was implemented to retrieve Jenkinsfiles through HTTP (
 URL: https://api.github.com/repos/[your_org]/[your_repo]/contents/[path_in_repo]?ref=master
 Accept Header: application/vnd.github.VERSION.raw
 
+### Use with the Gerrit API
+
+[Gerrit API](https://gerrit-review.googlesource.com/Documentation/rest-api-projects.html#get-content)
+Using gerrit rest api you can fetch contents of the file, It is in base64 encoded format. This plugin supports decoding the content.
+
 ## Releasing
 To release simply call the following script:
 ```

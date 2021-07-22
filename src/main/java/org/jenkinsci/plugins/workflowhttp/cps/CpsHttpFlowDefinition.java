@@ -69,18 +69,20 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
   private final String setKeyHeader;
   private final String setValueHeader;
   private final int retryCount;
+  private final boolean base64Decode;
   private final CachingConfiguration cachingConfiguration;
   private String credentialsId;
 
   @DataBoundConstructor
   public CpsHttpFlowDefinition(
-      String scriptUrl, String setAcceptHeader, String setKeyHeader, String setValueHeader,  int retryCount, CachingConfiguration cachingConfiguration) {
+      String scriptUrl, String setAcceptHeader, String setKeyHeader, String setValueHeader,  int retryCount, CachingConfiguration cachingConfiguration, boolean base64Decode) {
     this.scriptUrl = scriptUrl.trim();
     this.setAcceptHeader = setAcceptHeader;
     this.setKeyHeader = setKeyHeader;
     this.setValueHeader = setValueHeader;
     this.retryCount = retryCount;
     this.cachingConfiguration = cachingConfiguration;
+    this.base64Decode = base64Decode;
   }
 
   public String getScriptUrl() {
@@ -107,6 +109,10 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
 
   public String getCredentialsId() {
     return credentialsId;
+  }
+
+  public boolean getBase64Decode() {
+    return base64Decode;
   }
 
   @DataBoundSetter
@@ -198,7 +204,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
             "get pipeline from " + expandedScriptUrl,
             c -> c.execute(httpGet),
             response -> {
-              try (InputStream is = response.getEntity().getContent()) {
+              try (InputStream is = base64Decode ? Base64.getDecoder().wrap(response.getEntity().getContent()) : response.getEntity().getContent()) {
                 String script = IOUtils.toString(is, "UTF-8");
                 pipelineCache.put(expandedScriptUrl, new CacheEntry(getExpirationDate(), script));
               }
@@ -213,7 +219,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
           "get pipeline from " + expandedScriptUrl,
           c -> c.execute(httpGet),
           response -> {
-            try (InputStream is = response.getEntity().getContent()) {
+            try (InputStream is = base64Decode ? Base64.getDecoder().wrap(response.getEntity().getContent()) : response.getEntity().getContent()) {
               String script = IOUtils.toString(is, "UTF-8");
               scriptReference.set(script);
             }
