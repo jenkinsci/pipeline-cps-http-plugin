@@ -15,8 +15,6 @@
         <!-- https://www.jenkins.io/doc/developer/plugin-development/choosing-jenkins-baseline/ -->
         <jenkins.baseline>2.346</jenkins.baseline>
         <jenkins.version>${jenkins.baseline}.3</jenkins.version>
-        <no-test-jar>false</no-test-jar>
-        <useBeta>true</useBeta>
     </properties>
     <name>Pipeline: Groovy HTTP</name>
     <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
@@ -106,17 +104,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.cloudbees</groupId>
-            <artifactId>groovy-cps</artifactId>
-            <version>1.31</version>
-            <classifier>tests</classifier>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>org.jenkins-ci.plugins.workflow</groupId>
+            <artifactId>workflow-cps</artifactId>
         </dependency>
         <dependency>
             <groupId>org.jenkins-ci.plugins</groupId>
@@ -134,16 +123,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore</artifactId>
-            <version>4.4.12</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.10</version>
-            <scope>compile</scope>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>apache-httpcomponents-client-4-api</artifactId>
         </dependency>
     </dependencies>
 
