@@ -9,11 +9,10 @@
     </parent>
     <groupId>io.jenkins.plugins</groupId>
     <artifactId>pipeline-cps-http</artifactId>
-    <version>${revision}${changelist}</version>
+    <version>${changelist}</version>
     <packaging>hpi</packaging>
     <properties>
-        <revision>0.4.0</revision>
-        <changelist>-SNAPSHOT</changelist>
+        <changelist>999999-SNAPSHOT</changelist>
         <gitHubRepo>jenkinsci/pipeline-cps-http-plugin</gitHubRepo>
         <!-- https://www.jenkins.io/doc/developer/plugin-development/choosing-jenkins-baseline/ -->
         <jenkins.baseline>2.346</jenkins.baseline>
