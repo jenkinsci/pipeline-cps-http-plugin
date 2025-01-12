@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.jenkins-ci.plugins</groupId>
         <artifactId>plugin</artifactId>
-        <version>4.51</version>
+        <version>5.4</version>
         <relativePath />
     </parent>
     <groupId>io.jenkins.plugins</groupId>
@@ -16,8 +16,8 @@
         <changelist>-SNAPSHOT</changelist>
         <gitHubRepo>jenkinsci/pipeline-cps-http-plugin</gitHubRepo>
         <!-- https://www.jenkins.io/doc/developer/plugin-development/choosing-jenkins-baseline/ -->
-        <jenkins.baseline>2.346</jenkins.baseline>
-        <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+        <jenkins.baseline>2.479</jenkins.baseline>
+        <jenkins.version>${jenkins.baseline}.1</jenkins.version>
     </properties>
     <name>Pipeline: Groovy HTTP</name>
     <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
@@ -38,7 +38,7 @@
             <dependency>
                 <groupId>io.jenkins.tools.bom</groupId>
                 <artifactId>bom-${jenkins.baseline}.x</artifactId>
-                <version>1763.v092b_8980a_f5e</version>
+                <version>3893.v213a_42768d35</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
