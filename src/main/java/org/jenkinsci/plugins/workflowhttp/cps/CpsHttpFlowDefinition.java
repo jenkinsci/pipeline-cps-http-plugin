@@ -238,7 +238,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     }
 
     public Collection<? extends SCMDescriptor<?>> getApplicableDescriptors() {
-      StaplerRequest req = Stapler.getCurrentRequest();
+      StaplerRequest2 req = Stapler.getCurrentRequest2();
       Job<?, ?> job = req != null ? req.findAncestorObject(Job.class) : null;
       return SCM._for(job);
     }
