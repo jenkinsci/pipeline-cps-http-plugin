@@ -12,5 +12,4 @@ public final class CacheEntry {
         this.expirationDate = expirationDate;
         this.script = script;
     }
-
 }
