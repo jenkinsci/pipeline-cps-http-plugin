@@ -3,7 +3,7 @@
 [![Build Status](https://ci.jenkins.io/buildStatus/icon?job=Plugins/pipeline-cps-http-plugin/main)](https://ci.jenkins.io/job/plugins/job/pipeline-cps-http-plugin/)
 [![Coverage](https://ci.jenkins.io/job/Plugins/job/pipeline-cps-http-plugin/job/main/badge/icon?status=${instructionCoverage}&subject=coverage&color=${colorInstructionCoverage})](https://ci.jenkins.io/job/Plugins/job/pipeline-cps-http-plugin/job/main)
 [![LOC](https://ci.jenkins.io/job/Plugins/job/pipeline-cps-http-plugin/job/main/badge/icon?job=test&status=${lineOfCode}&subject=line%20of%20code&color=blue)](https://ci.jenkins.io/job/Plugins/job/pipeline-cps-http-plugin/job/main)
-[![Jenkins Plugin](https://img.shields.io/jenkins/plugin/v/oss-symbols-api.svg)](https://plugins.jenkins.io/oss-symbols-api/)
+[![Jenkins Plugin](https://img.shields.io/jenkins/plugin/v/pipeline-cps-http.svg)](https://plugins.jenkins.io/pipeline-cps-http/)
 [![GitHub release](https://img.shields.io/github/release/jenkinsci/pipeline-cps-http-plugin.svg?label=changelog)](https://github.com/jenkinsci/pipeline-cps-http-plugin/releases/latest)
 [![Contributors](https://img.shields.io/github/contributors/jenkinsci/pipeline-cps-http-plugin.svg)](https://github.com/jenkinsci/pipeline-cps-http-plugin/graphs/contributors)
 
