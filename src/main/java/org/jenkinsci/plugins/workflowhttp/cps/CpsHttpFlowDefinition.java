@@ -24,6 +24,8 @@
 
 package org.jenkinsci.plugins.workflowhttp.cps;
 
+import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.JOB;
+
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
@@ -33,13 +35,21 @@ import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Util;
-import hudson.model.Queue;
 import hudson.model.*;
+import hudson.model.Queue;
 import hudson.scm.SCM;
 import hudson.scm.SCMDescriptor;
 import hudson.security.ACL;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nonnull;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
@@ -50,237 +60,225 @@ import org.jenkinsci.plugins.workflow.cps.persistence.PersistIn;
 import org.jenkinsci.plugins.workflow.flow.*;
 import org.kohsuke.stapler.*;
 
-import javax.annotation.Nonnull;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.jenkinsci.plugins.workflow.cps.persistence.PersistenceContext.JOB;
-
 @PersistIn(JOB)
 public class CpsHttpFlowDefinition extends FlowDefinition {
 
-  private final String scriptUrl;
-  private final String setAcceptHeader;
-  private final String setKeyHeader;
-  private final String setValueHeader;
-  private final int retryCount;
-  private final CachingConfiguration cachingConfiguration;
-  private String credentialsId;
+    private final String scriptUrl;
+    private final String setAcceptHeader;
+    private final String setKeyHeader;
+    private final String setValueHeader;
+    private final int retryCount;
+    private final CachingConfiguration cachingConfiguration;
+    private String credentialsId;
 
-  @DataBoundConstructor
-  public CpsHttpFlowDefinition(
-      String scriptUrl, String setAcceptHeader, String setKeyHeader, String setValueHeader,  int retryCount, CachingConfiguration cachingConfiguration) {
-    this.scriptUrl = scriptUrl.trim();
-    this.setAcceptHeader = setAcceptHeader;
-    this.setKeyHeader = setKeyHeader;
-    this.setValueHeader = setValueHeader;
-    this.retryCount = retryCount;
-    this.cachingConfiguration = cachingConfiguration;
-  }
-
-  public String getScriptUrl() {
-    return scriptUrl;
-  }
-
-  public String getSetAcceptHeader() { return setAcceptHeader;}
-
-  public String getSetKeyHeader() { return setKeyHeader; }
-
-  public String getSetValueHeader() { return setValueHeader; }
-
-  public int getRetryCount() {
-    return retryCount;
-  }
-
-  public CachingConfiguration getCachingConfiguration() {
-    return cachingConfiguration;
-  }
-
-  public Instant getExpirationDate() {
-    return Instant.now().plusSeconds(cachingConfiguration.getCachingSeconds());
-  }
-
-  public String getCredentialsId() {
-    return credentialsId;
-  }
-
-  @DataBoundSetter
-  public void setCredentialsId(String credentialsId) {
-    this.credentialsId = Util.fixEmpty(credentialsId);
-  }
-
-  @Override
-  public CpsFlowExecution create(
-      FlowExecutionOwner owner, TaskListener listener, List<? extends Action> actions)
-      throws Exception {
-
-    // This little bit of code allows replays to work
-    for (Action a : actions) {
-      if (a instanceof CpsFlowFactoryAction2) {
-        return ((CpsFlowFactoryAction2) a).create(this, owner, actions);
-      }
+    @DataBoundConstructor
+    public CpsHttpFlowDefinition(
+            String scriptUrl,
+            String setAcceptHeader,
+            String setKeyHeader,
+            String setValueHeader,
+            int retryCount,
+            CachingConfiguration cachingConfiguration) {
+        this.scriptUrl = scriptUrl.trim();
+        this.setAcceptHeader = setAcceptHeader;
+        this.setKeyHeader = setKeyHeader;
+        this.setValueHeader = setValueHeader;
+        this.retryCount = retryCount;
+        this.cachingConfiguration = cachingConfiguration;
     }
 
-    Queue.Executable _build = owner.getExecutable();
-    if (!(_build instanceof Run)) {
-      throw new IOException("Can only pull a Jenkinsfile in a run");
-    }
-    Run<?, ?> build = (Run<?, ?>) _build;
-
-    EnvVars envVars = build.getEnvironment(listener);
-    String expandedScriptUrl = envVars.expand(scriptUrl);
-    listener.getLogger().println("Fetching pipeline from " + expandedScriptUrl);
-
-    RobustHTTPClient client = new RobustHTTPClient();
-    client.setStopAfterAttemptNumber(retryCount + 1);
-    client.setWaitMultiplier(1, TimeUnit.SECONDS);
-
-    HttpGet httpGet = new HttpGet(expandedScriptUrl);
-    if (setAcceptHeader != null && !setAcceptHeader.isEmpty()) {
-      httpGet.setHeader(HttpHeaders.ACCEPT, setAcceptHeader);
-    }
-    if (setKeyHeader != null && !setKeyHeader.isEmpty() && setValueHeader != null && !setValueHeader.isEmpty()){
-      httpGet.setHeader(setKeyHeader, setValueHeader);
-    }
-    if (credentialsId != null) {
-      UsernamePasswordCredentials credentials =
-          CredentialsMatchers.firstOrNull(
-              CredentialsProvider.lookupCredentials(
-                  UsernamePasswordCredentials.class,
-                  Jenkins.get(),
-                  ACL.SYSTEM,
-                  Collections.emptyList()),
-              CredentialsMatchers.withId(credentialsId));
-      if (credentials != null) {
-        String encoded =
-            Base64.getEncoder()
-                .encodeToString(
-                    (credentials.getUsername() + ":" + credentials.getPassword())
-                        .getBytes(StandardCharsets.UTF_8));
-        httpGet.setHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
-        CredentialsProvider.track(build, credentials);
-      }
+    public String getScriptUrl() {
+        return scriptUrl;
     }
 
-    AtomicReference<String> scriptReference = new AtomicReference<>(null);
-
-    boolean shouldCache = true;
-    if (cachingConfiguration == null) {
-      listener.getLogger().println("No caching config. Fetching from HTTP");
-      shouldCache = false;
-    }
-    if (shouldCache && cachingConfiguration.isExcluded(envVars)) {
-      listener.getLogger().println("Caching excluded from environment variables");
-      shouldCache = false;
+    public String getSetAcceptHeader() {
+        return setAcceptHeader;
     }
 
-    if (shouldCache) {
-      Map<String, CacheEntry> pipelineCache = CacheEntry.cache;
-
-      if (pipelineCache.containsKey(expandedScriptUrl)) {
-        listener.getLogger().println("Fetching from cache");
-        if (pipelineCache.get(expandedScriptUrl).expirationDate.isBefore(Instant.now())) {
-          listener.getLogger().println("Cache is expired. Clearing");
-          pipelineCache.remove(expandedScriptUrl);
-        }
-      } else {
-        listener.getLogger().println("Cache miss. Actually fetching from HTTP");
-      }
-
-      if (!pipelineCache.containsKey(expandedScriptUrl)) {
-        client.connect(
-            "get pipeline",
-            "get pipeline from " + expandedScriptUrl,
-            c -> c.execute(httpGet),
-            response -> {
-              try (InputStream is = response.getEntity().getContent()) {
-                String script = IOUtils.toString(is, "UTF-8");
-                pipelineCache.put(expandedScriptUrl, new CacheEntry(getExpirationDate(), script));
-              }
-            },
-            listener);
-      }
-
-      scriptReference.set(pipelineCache.get(expandedScriptUrl).script);
-    } else {
-      client.connect(
-          "get pipeline",
-          "get pipeline from " + expandedScriptUrl,
-          c -> c.execute(httpGet),
-          response -> {
-            try (InputStream is = response.getEntity().getContent()) {
-              String script = IOUtils.toString(is, "UTF-8");
-              scriptReference.set(script);
-            }
-          },
-          listener);
+    public String getSetKeyHeader() {
+        return setKeyHeader;
     }
 
-    Queue.Executable queueExec = owner.getExecutable();
-    FlowDurabilityHint hint =
-        (queueExec instanceof Run)
-            ? DurabilityHintProvider.suggestedFor(((Run) queueExec).getParent())
-            : GlobalDefaultFlowDurabilityLevel.getDefaultDurabilityHint();
-    return new CpsFlowExecution(scriptReference.get(), true, owner, hint);
-  }
+    public String getSetValueHeader() {
+        return setValueHeader;
+    }
 
-  @Extension
-  public static class DescriptorImpl extends FlowDefinitionDescriptor {
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public CachingConfiguration getCachingConfiguration() {
+        return cachingConfiguration;
+    }
+
+    public Instant getExpirationDate() {
+        return Instant.now().plusSeconds(cachingConfiguration.getCachingSeconds());
+    }
+
+    public String getCredentialsId() {
+        return credentialsId;
+    }
+
+    @DataBoundSetter
+    public void setCredentialsId(String credentialsId) {
+        this.credentialsId = Util.fixEmpty(credentialsId);
+    }
+
     @Override
-    @Nonnull
-    public String getDisplayName() {
-      return "Pipeline script from HTTP";
+    public CpsFlowExecution create(FlowExecutionOwner owner, TaskListener listener, List<? extends Action> actions)
+            throws Exception {
+
+        // This little bit of code allows replays to work
+        for (Action a : actions) {
+            if (a instanceof CpsFlowFactoryAction2) {
+                return ((CpsFlowFactoryAction2) a).create(this, owner, actions);
+            }
+        }
+
+        Queue.Executable _build = owner.getExecutable();
+        if (!(_build instanceof Run)) {
+            throw new IOException("Can only pull a Jenkinsfile in a run");
+        }
+        Run<?, ?> build = (Run<?, ?>) _build;
+
+        EnvVars envVars = build.getEnvironment(listener);
+        String expandedScriptUrl = envVars.expand(scriptUrl);
+        listener.getLogger().println("Fetching pipeline from " + expandedScriptUrl);
+
+        RobustHTTPClient client = new RobustHTTPClient();
+        client.setStopAfterAttemptNumber(retryCount + 1);
+        client.setWaitMultiplier(1, TimeUnit.SECONDS);
+
+        HttpGet httpGet = new HttpGet(expandedScriptUrl);
+        if (setAcceptHeader != null && !setAcceptHeader.isEmpty()) {
+            httpGet.setHeader(HttpHeaders.ACCEPT, setAcceptHeader);
+        }
+        if (setKeyHeader != null && !setKeyHeader.isEmpty() && setValueHeader != null && !setValueHeader.isEmpty()) {
+            httpGet.setHeader(setKeyHeader, setValueHeader);
+        }
+        if (credentialsId != null) {
+            UsernamePasswordCredentials credentials = CredentialsMatchers.firstOrNull(
+                    CredentialsProvider.lookupCredentials(
+                            UsernamePasswordCredentials.class, Jenkins.get(), ACL.SYSTEM, Collections.emptyList()),
+                    CredentialsMatchers.withId(credentialsId));
+            if (credentials != null) {
+                String encoded = Base64.getEncoder()
+                        .encodeToString((credentials.getUsername() + ":" + credentials.getPassword())
+                                .getBytes(StandardCharsets.UTF_8));
+                httpGet.setHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
+                CredentialsProvider.track(build, credentials);
+            }
+        }
+
+        AtomicReference<String> scriptReference = new AtomicReference<>(null);
+
+        boolean shouldCache = true;
+        if (cachingConfiguration == null) {
+            listener.getLogger().println("No caching config. Fetching from HTTP");
+            shouldCache = false;
+        }
+        if (shouldCache && cachingConfiguration.isExcluded(envVars)) {
+            listener.getLogger().println("Caching excluded from environment variables");
+            shouldCache = false;
+        }
+
+        if (shouldCache) {
+            Map<String, CacheEntry> pipelineCache = CacheEntry.cache;
+
+            if (pipelineCache.containsKey(expandedScriptUrl)) {
+                listener.getLogger().println("Fetching from cache");
+                if (pipelineCache.get(expandedScriptUrl).expirationDate.isBefore(Instant.now())) {
+                    listener.getLogger().println("Cache is expired. Clearing");
+                    pipelineCache.remove(expandedScriptUrl);
+                }
+            } else {
+                listener.getLogger().println("Cache miss. Actually fetching from HTTP");
+            }
+
+            if (!pipelineCache.containsKey(expandedScriptUrl)) {
+                client.connect(
+                        "get pipeline",
+                        "get pipeline from " + expandedScriptUrl,
+                        c -> c.execute(httpGet),
+                        response -> {
+                            try (InputStream is = response.getEntity().getContent()) {
+                                String script = IOUtils.toString(is, "UTF-8");
+                                pipelineCache.put(expandedScriptUrl, new CacheEntry(getExpirationDate(), script));
+                            }
+                        },
+                        listener);
+            }
+
+            scriptReference.set(pipelineCache.get(expandedScriptUrl).script);
+        } else {
+            client.connect(
+                    "get pipeline",
+                    "get pipeline from " + expandedScriptUrl,
+                    c -> c.execute(httpGet),
+                    response -> {
+                        try (InputStream is = response.getEntity().getContent()) {
+                            String script = IOUtils.toString(is, "UTF-8");
+                            scriptReference.set(script);
+                        }
+                    },
+                    listener);
+        }
+
+        Queue.Executable queueExec = owner.getExecutable();
+        FlowDurabilityHint hint = (queueExec instanceof Run)
+                ? DurabilityHintProvider.suggestedFor(((Run) queueExec).getParent())
+                : GlobalDefaultFlowDurabilityLevel.getDefaultDurabilityHint();
+        return new CpsFlowExecution(scriptReference.get(), true, owner, hint);
     }
 
-    public Collection<? extends SCMDescriptor<?>> getApplicableDescriptors() {
-      StaplerRequest2 req = Stapler.getCurrentRequest2();
-      Job<?, ?> job = req != null ? req.findAncestorObject(Job.class) : null;
-      return SCM._for(job);
-    }
+    @Extension
+    public static class DescriptorImpl extends FlowDefinitionDescriptor {
+        @Override
+        @Nonnull
+        public String getDisplayName() {
+            return "Pipeline script from HTTP";
+        }
 
-    public FormValidation doCheckExcludedCasesString(@QueryParameter String value) {
-      for (String splitValue : value.split(" ")) {
-        splitValue = splitValue.trim();
-        if (splitValue.isEmpty()) {
-          continue;
+        public Collection<? extends SCMDescriptor<?>> getApplicableDescriptors() {
+            StaplerRequest2 req = Stapler.getCurrentRequest2();
+            Job<?, ?> job = req != null ? req.findAncestorObject(Job.class) : null;
+            return SCM._for(job);
         }
-        if (splitValue.split("=").length != 2) {
-          return FormValidation.error("Each entry must contain one equal sign");
-        }
-      }
 
-      return FormValidation.ok();
-    }
+        public FormValidation doCheckExcludedCasesString(@QueryParameter String value) {
+            for (String splitValue : value.split(" ")) {
+                splitValue = splitValue.trim();
+                if (splitValue.isEmpty()) {
+                    continue;
+                }
+                if (splitValue.split("=").length != 2) {
+                    return FormValidation.error("Each entry must contain one equal sign");
+                }
+            }
 
-    public ListBoxModel doFillCredentialsIdItems(
-        @AncestorInPath Item item,
-        @QueryParameter String scriptUrl,
-        @QueryParameter String credentialsId) {
-      final StandardListBoxModel result = new StandardListBoxModel();
-      if (item == null) {
-        if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
-          return result.includeCurrentValue(credentialsId);
+            return FormValidation.ok();
         }
-      } else {
-        if (!item.hasPermission(Item.EXTENDED_READ)
-            && !item.hasPermission(CredentialsProvider.USE_ITEM)) {
-          return result.includeCurrentValue(credentialsId);
+
+        public ListBoxModel doFillCredentialsIdItems(
+                @AncestorInPath Item item, @QueryParameter String scriptUrl, @QueryParameter String credentialsId) {
+            final StandardListBoxModel result = new StandardListBoxModel();
+            if (item == null) {
+                if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
+                    return result.includeCurrentValue(credentialsId);
+                }
+            } else {
+                if (!item.hasPermission(Item.EXTENDED_READ) && !item.hasPermission(CredentialsProvider.USE_ITEM)) {
+                    return result.includeCurrentValue(credentialsId);
+                }
+            }
+            return result.includeEmptyValue()
+                    .includeMatchingAs(
+                            ACL.SYSTEM,
+                            Jenkins.get(),
+                            StandardUsernamePasswordCredentials.class,
+                            URIRequirementBuilder.fromUri(scriptUrl).build(),
+                            CredentialsMatchers.always())
+                    .includeCurrentValue(credentialsId);
         }
-      }
-      return result
-          .includeEmptyValue()
-          .includeMatchingAs(
-              ACL.SYSTEM,
-              Jenkins.get(),
-              StandardUsernamePasswordCredentials.class,
-              URIRequirementBuilder.fromUri(scriptUrl).build(),
-              CredentialsMatchers.always())
-          .includeCurrentValue(credentialsId);
     }
-  }
 }
