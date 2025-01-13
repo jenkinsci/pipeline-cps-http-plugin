@@ -54,6 +54,7 @@ import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.HttpGet;
+import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowExecution;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowFactoryAction2;
 import org.jenkinsci.plugins.workflow.cps.persistence.PersistIn;
@@ -64,14 +65,14 @@ import org.kohsuke.stapler.*;
 public class CpsHttpFlowDefinition extends FlowDefinition {
 
     private final String scriptUrl;
-    private final String setAcceptHeader;
-    private final String setKeyHeader;
-    private final String setValueHeader;
-    private final int retryCount;
-    private final CachingConfiguration cachingConfiguration;
+    private String setAcceptHeader;
+    private String setKeyHeader;
+    private String setValueHeader;
+    private int retryCount;
+    private CachingConfiguration cachingConfiguration;
     private String credentialsId;
 
-    @DataBoundConstructor
+    @Deprecated
     public CpsHttpFlowDefinition(
             String scriptUrl,
             String setAcceptHeader,
@@ -85,6 +86,11 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
         this.setValueHeader = setValueHeader;
         this.retryCount = retryCount;
         this.cachingConfiguration = cachingConfiguration;
+    }
+
+    @DataBoundConstructor
+    public CpsHttpFlowDefinition(String scriptUrl) {
+        this.scriptUrl = scriptUrl.trim();
     }
 
     public String getScriptUrl() {
@@ -117,6 +123,31 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
 
     public String getCredentialsId() {
         return credentialsId;
+    }
+
+    @DataBoundSetter
+    public void setSetAcceptHeader(String setAcceptHeader) {
+        this.setAcceptHeader = setAcceptHeader;
+    }
+
+    @DataBoundSetter
+    public void setSetKeyHeader(String setKeyHeader) {
+        this.setKeyHeader = setKeyHeader;
+    }
+
+    @DataBoundSetter
+    public void setSetValueHeader(String setValueHeader) {
+        this.setValueHeader = setValueHeader;
+    }
+
+    @DataBoundSetter
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    @DataBoundSetter
+    public void setCachingConfiguration(CachingConfiguration cachingConfiguration) {
+        this.cachingConfiguration = cachingConfiguration;
     }
 
     @DataBoundSetter
@@ -232,6 +263,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     }
 
     @Extension
+    @Symbol("cpsHttp")
     public static class DescriptorImpl extends FlowDefinitionDescriptor {
         @Override
         @Nonnull

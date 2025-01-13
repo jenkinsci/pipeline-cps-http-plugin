@@ -45,6 +45,22 @@ public class CpsHttpFlowDefinitionTest {
     public JenkinsRule r = new JenkinsRule();
 
     @Test
+    public void testRunScriptFromUserContentWithDefault() throws Exception {
+        WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
+        Path path =
+                Paths.get(r.jenkins.getRootPath().getRemote(), "userContent", "testRunScriptFromUserContent.groovy");
+        Files.write(path, "echo 'Hello from HTTP'".getBytes());
+
+        String url = r.jenkins.getRootUrl() + "userContent/testRunScriptFromUserContent.groovy";
+        CpsHttpFlowDefinition def = new CpsHttpFlowDefinition(url);
+        p.setDefinition(def);
+        WorkflowRun b = r.buildAndAssertSuccess(p);
+        r.assertLogContains("Fetching pipeline from " + url, b);
+        r.assertLogContains("No caching config. Fetching from HTTP", b);
+        r.assertLogContains("Hello from HTTP", b);
+    }
+
+    @Test
     public void testRunScriptFromUserContent() throws Exception {
         WorkflowJob p = r.jenkins.createProject(WorkflowJob.class, "p");
         Path path =
