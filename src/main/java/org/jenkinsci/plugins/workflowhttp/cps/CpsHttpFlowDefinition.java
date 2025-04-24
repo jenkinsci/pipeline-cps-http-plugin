@@ -52,8 +52,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowExecution;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowFactoryAction2;
@@ -233,7 +233,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
                         c -> c.execute(httpGet),
                         response -> {
                             try (InputStream is = response.getEntity().getContent()) {
-                                String script = IOUtils.toString(is, "UTF-8");
+                                String script = IOUtils.toString(is, StandardCharsets.UTF_8);
                                 pipelineCache.put(expandedScriptUrl, new CacheEntry(getExpirationDate(), script));
                             }
                         },
@@ -248,7 +248,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
                     c -> c.execute(httpGet),
                     response -> {
                         try (InputStream is = response.getEntity().getContent()) {
-                            String script = IOUtils.toString(is, "UTF-8");
+                            String script = IOUtils.toString(is, StandardCharsets.UTF_8);
                             scriptReference.set(script);
                         }
                     },

@@ -20,16 +20,16 @@ import jenkins.security.MasterToSlaveCallable;
 import jenkins.util.JenkinsJVM;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.StatusLine;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.entity.FileEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.FileEntity;
+import org.apache.hc.core5.http.message.StatusLine;
 
 /** Utility to make HTTP connections with protection against transient failures. */
 public final class RobustHTTPClient implements Serializable {
@@ -46,9 +46,9 @@ public final class RobustHTTPClient implements Serializable {
     private long timeout;
 
     /**
-     * Creates a client configured with reasonable defaults from system properties. THIS IS A COPY OF
-     * https://github.com/jenkinsci/apache-httpcomponents-client-4-api-plugin but it retries on all
-     * errors
+     * Creates a client configured with reasonable defaults from system properties. THIS IS A ADAPTED
+     * COPY OF https://github.com/jenkinsci/apache-httpcomponents-client-4-api-plugin but uses
+     * httpclient5 and retries on all errors
      *
      * <p>This constructor should be run in the Jenkins master. To make requests from an agent JVM,
      * create a {@code final} field of this type in your {@link MasterToSlaveCallable} or similar; set
@@ -148,19 +148,15 @@ public final class RobustHTTPClient implements Serializable {
                                 responseCode.set(0);
                                 try (CloseableHttpClient client = HttpClients.createSystem()) {
                                     try (CloseableHttpResponse response = connectionCreator.connect(client)) {
-                                        StatusLine statusLine = response.getStatusLine();
-                                        responseCode.set(statusLine != null ? statusLine.getStatusCode() : 0);
+                                        StatusLine statusLine = new StatusLine(response);
+                                        responseCode.set(statusLine.getStatusCode());
                                         if (responseCode.get() < 200 || responseCode.get() >= 300) {
                                             String diag;
                                             HttpEntity entity = response.getEntity();
                                             if (entity != null) {
                                                 try (InputStream err = entity.getContent()) {
-                                                    Header contentEncoding = entity.getContentEncoding();
-                                                    diag = IOUtils.toString(
-                                                            err,
-                                                            contentEncoding != null
-                                                                    ? contentEncoding.getValue()
-                                                                    : null);
+                                                    String contentEncoding = entity.getContentEncoding();
+                                                    diag = IOUtils.toString(err, contentEncoding);
                                                 }
                                             } else {
                                                 diag = null;
@@ -169,7 +165,7 @@ public final class RobustHTTPClient implements Serializable {
                                                     "Failed to %s, response: %d %s, body: %s",
                                                     whatVerbose,
                                                     responseCode.get(),
-                                                    statusLine != null ? statusLine.getReasonPhrase() : "?",
+                                                    statusLine.getReasonPhrase(),
                                                     diag));
                                         }
                                         connectionUser.use(response);
@@ -228,7 +224,7 @@ public final class RobustHTTPClient implements Serializable {
                 "upload " + f + " to " + sanitize(url),
                 client -> {
                     HttpPut put = new HttpPut(url.toString());
-                    put.setEntity(new FileEntity(f));
+                    put.setEntity(new FileEntity(f, ContentType.parse(contentType)));
                     if (contentType != null) {
                         put.setHeader("Content-Type", contentType);
                     }
@@ -262,7 +258,7 @@ public final class RobustHTTPClient implements Serializable {
 
     /**
      * How to initiate a connection. For example, call {@link
-     * CloseableHttpClient#execute(HttpUriRequest)} on {@link HttpGet#HttpGet(String)}.
+     * CloseableHttpClient#execute(ClassicHttpRequest)} on {@link HttpGet#HttpGet(String)}.
      *
      * @see #connect
      */
