@@ -32,6 +32,7 @@ import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Util;
@@ -49,7 +50,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nonnull;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -266,7 +266,7 @@ public class CpsHttpFlowDefinition extends FlowDefinition {
     @Symbol("cpsHttp")
     public static class DescriptorImpl extends FlowDefinitionDescriptor {
         @Override
-        @Nonnull
+        @NonNull
         public String getDisplayName() {
             return "Pipeline script from HTTP";
         }
